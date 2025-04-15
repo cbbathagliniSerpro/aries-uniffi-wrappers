@@ -15,9 +15,13 @@ use anoncreds::types::{
     RevocationRegistryDefinition as RustRevocationRegistryDefinition,
     RevocationRegistryDefinitionPrivate as RustRevocationRegistryDefinitionPrivate,
 };
+use anoncreds::data_types::w3c::credential::W3CCredential as RustW3cCredential;
 use anoncreds_clsignatures::RevocationRegistryDelta as RustRevocationRegistryDelta;
 use std::collections::HashMap;
 use std::sync::Arc;
+use anoncreds::data_types::w3c::context::Context;
+
+
 
 pub struct Schema(pub RustSchema);
 
@@ -118,6 +122,7 @@ pub struct CredentialRequestTuple {
     pub metadata: Arc<CredentialRequestMetadata>,
 }
 
+#[derive(Debug)]
 pub struct RevocationRegistryDefinition(pub RustRevocationRegistryDefinition);
 
 #[uniffi::export]
@@ -182,6 +187,7 @@ impl<'a> From<&'a CredentialRevocationConfig> for RustCredentialRevocationConfig
     }
 }
 
+#[derive(Debug)]
 pub struct Credential(pub RustCredential);
 
 #[uniffi::export]
@@ -221,6 +227,72 @@ impl Credential {
             .map(|(key, value)| (key.clone(), value.raw.clone()))
             .collect()
     }
+}
+
+#[derive(Debug)]
+pub struct W3CCredential(pub RustW3cCredential);
+
+#[uniffi::export]
+impl W3CCredential {
+    
+    #[uniffi::constructor]
+    pub fn new(json: String) -> Result<Arc<Self>, ErrorCode> {
+        println!("new w3c credential constructor");
+
+        match serde_json::from_str::<RustW3cCredential>(&json) {
+            Ok(parsed_cred) => {
+                println!("Credential created: {:?}", parsed_cred);
+                Ok(Arc::new(Self(parsed_cred)))
+            }
+            Err(e) => {
+                println!("Error creating credential: {:?}", e);
+                Err(e.into()) // assuming your ErrorCode implements From<serde_json::Error>
+            }
+        }
+    }
+    
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(&self.0).unwrap()
+    }
+
+    pub fn context(&self) -> String {
+        self.0.context.0
+        .iter()
+        .map(|ctx| match ctx {
+            Context::URI(uri) => uri.0.clone(),
+            Context::Object(obj) => obj.to_string(),
+        })
+        .collect()
+    }
+
+    pub fn id(&self) -> Option<String> {
+        self.0.id.as_ref().map(|uri| uri.0.clone())
+    }
+    
+    pub fn r#type(&self) -> Vec<String> {
+        self.0.type_.0.iter().cloned().collect()
+    }
+
+    pub fn issuer(&self) -> String {
+        serde_json::to_string(&self.0.issuer).unwrap()
+    }
+
+    pub fn credential_subject(&self) -> String {
+        serde_json::to_string(&self.0.credential_subject).unwrap()
+    }
+
+    pub fn issuance_date(&self) -> String {
+        serde_json::to_string(&self.0.issuance_date).unwrap()
+    }
+
+    pub fn proof(&self) -> String {
+        serde_json::to_string(&self.0.proof).unwrap()
+    }
+
+    pub fn valid_from(&self) -> String {
+        serde_json::to_string(&self.0.valid_from).unwrap()
+    }
+
 }
 
 #[derive(uniffi::Record)]
@@ -268,3 +340,4 @@ define_serializable_struct!(
     RevocationRegistryDefinitionPrivate,
     RustRevocationRegistryDefinitionPrivate
 );
+//define_serializable_struct!(W3CCredential,RustW3cCredential);
